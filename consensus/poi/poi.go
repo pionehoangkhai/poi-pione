@@ -149,7 +149,7 @@ func (e *PoIEngine) Finalize(chain consensus.ChainHeaderReader, header *types.He
 
 	// FIXED: Only commit state if not already committed
 	if header.Root == (common.Hash{}) && state != nil {
-		stateRoot, err := state.Commit(header.Number.Uint64(), true)
+		stateRoot, err := state.Commit(header.Number.Uint64(), true, false)
 		if err != nil {
 			log.Error("Failed to commit state in Finalize", "err", err, "number", header.Number)
 		} else {
@@ -184,7 +184,7 @@ func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, heade
 	// FIXED: Proper state root handling
 	if header.Root == (common.Hash{}) {
 		if state != nil {
-			stateRoot, err := state.Commit(header.Number.Uint64(), true)
+			stateRoot, err := state.Commit(header.Number.Uint64(), true, false)
 			if err != nil {
 				return nil, fmt.Errorf("failed to commit state: %v", err)
 			}
@@ -212,8 +212,11 @@ func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, heade
 	header.UncleHash = types.EmptyUncleHash
 
 	log.Debug("Assembled block", "number", header.Number, "validator", validator.Hex(), "txs", len(txs), "state_root", header.Root.Hex())
-	
-	return types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil)), nil
+	body := &types.Body{
+    Transactions: txs,
+    Uncles:       uncles,
+}
+return types.NewBlock(header, body, receipts, types.HomesteadTrieHasher{}), nil
 }
 
 func (e *PoIEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
@@ -430,8 +433,11 @@ func (e *PoIEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block, 
 		e.taskMutex.Unlock()
 
 		// Create sealed block
-		sealed := types.NewBlock(&signedHeader, block.Transactions(), block.Uncles(), nil, trie.NewStackTrie(nil))
-
+		body := &types.Body{
+    Transactions: block.Transactions(),
+    Uncles:       block.Uncles(),
+}
+		sealed := types.NewBlock(&signedHeader, body, nil, types.HomesteadTrieHasher{})
 		// Send result
 		select {
 		case results <- sealed:

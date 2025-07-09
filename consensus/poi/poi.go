@@ -216,7 +216,7 @@ func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, heade
     Transactions: txs,
     Uncles:       uncles,
 }
-hasher := types.NewHasherFromConfig(chain.Config())
+hasher := trie.NewStackTrieHasher(16)
 return types.NewBlock(header, body, receipts, hasher), nil
 }
 

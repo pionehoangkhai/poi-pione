@@ -216,7 +216,8 @@ func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, heade
     Transactions: txs,
     Uncles:       uncles,
 }
-return types.NewBlock(header, body, receipts, types.HomesteadTrieHasher{}), nil
+hasher := types.NewHasherFromConfig(chain.Config())
+return types.NewBlock(header, body, receipts, hasher), nil
 }
 
 func (e *PoIEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {

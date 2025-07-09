@@ -22,6 +22,8 @@ import (
 	"math"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -130,4 +132,9 @@ func DeriveSha(list DerivableList, hasher TrieHasher) common.Hash {
 		hasher.Update(indexBuf, value)
 	}
 	return hasher.Hash()
+}
+// NewHasherFromConfig returns a default trie hasher.
+// You can later improve this to return different hashers based on fork rules.
+func NewHasherFromConfig(config *params.ChainConfig) TrieHasher {
+	return trie.NewStackTrieHasher(16) // 16 là cache limit mặc định
 }

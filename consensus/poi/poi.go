@@ -214,11 +214,11 @@ func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, heade
 
 	log.Debug("Assembled block", "number", header.Number, "validator", validator.Hex(), "txs", len(txs), "state_root", header.Root.Hex())
 	
-	body := &types.Body{
+body := &types.Body{
     Transactions: txs,
     Uncles:       uncles,
 }
-var hasher types.TrieHasher = &types.DefaultHasher{}
+hasher := types.NewHasher() // ✅ dùng hasher chính thức
 return types.NewBlock(header, body, receipts, hasher), nil
 }
 

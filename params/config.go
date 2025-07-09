@@ -434,6 +434,7 @@ type ChainConfig struct {
 	// Various consensus engines
 	Ethash             *EthashConfig       `json:"ethash,omitempty"`
 	Clique             *CliqueConfig       `json:"clique,omitempty"`
+	PoI *PoIConfig `json:"poi,omitempty"` // thêm dòng này
 	BlobScheduleConfig *BlobScheduleConfig `json:"blobSchedule,omitempty"`
 }
 
@@ -450,7 +451,16 @@ type CliqueConfig struct {
 	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
 	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
 }
-
+type PoIConfig struct {
+    Period                uint64  `json:"period"`
+    Alpha                 float64 `json:"alpha"`
+    Beta                  float64 `json:"beta"`
+    BoostFactor           float64 `json:"boostFactor"`
+    SlidingWindowPercent  float64 `json:"slidingWindowPercent"`
+    CooldownTrigger       uint64  `json:"cooldownTrigger"`
+    CooldownPeriod        uint64  `json:"cooldownPeriod"`
+    DecayEpochSize        uint64  `json:"decayEpochSize"`
+}
 // String implements the stringer interface, returning the consensus engine details.
 func (c CliqueConfig) String() string {
 	return fmt.Sprintf("clique(period: %d, epoch: %d)", c.Period, c.Epoch)

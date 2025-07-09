@@ -26,7 +26,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
-
+	"github.com/ethereum/go-ethereum/consensus/poi"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/external"
 	"github.com/ethereum/go-ethereum/accounts/keystore"

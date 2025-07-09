@@ -12,7 +12,8 @@ import (
 	"hash"
 	"context"
 
-
+	
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -144,83 +145,98 @@ func (e *PoIEngine) Prepare(chain consensus.ChainHeaderReader, header *types.Hea
 	return nil
 }
 
-func (e *PoIEngine) Finalize(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, withdrawals []*types.Withdrawal) {
+func (e *PoIEngine) Finalize(
+	chain consensus.ChainHeaderReader,
+	header *types.Header,
+	statedb vm.StateDB,
+	body *types.Body,
+) {
 	e.lock.Lock()
 	defer e.lock.Unlock()
 
-	// FIXED: Only commit state if not already committed
-	if header.Root == (common.Hash{}) && state != nil {
-		stateRoot, err := state.Commit(header.Number.Uint64(), true, false)
-		if err != nil {
-			log.Error("Failed to commit state in Finalize", "err", err, "number", header.Number)
-		} else {
-			header.Root = stateRoot
-			log.Debug("Committed state root in Finalize", "root", stateRoot.Hex(), "number", header.Number)
-		}
-	}
-
-	// Update validator state after successful block
-	validator := header.Coinbase
-	e.updateValidatorState(validator)
-	
-	if e.config.DecayEpochSize > 0 && e.blockNumber%e.config.DecayEpochSize == 0 {
-		e.decayAllReputation()
-	}
-
-	log.Debug("Finalized block", "number", header.Number, "validator", validator.Hex(), "txs", len(txs))
-}
-
-func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	// Update validator state after successful block
-	validator := header.Coinbase
-	e.updateValidatorState(validator)
-	
-	if e.config.DecayEpochSize > 0 && e.blockNumber%e.config.DecayEpochSize == 0 {
-		e.decayAllReputation()
-	}
-
-	// FIXED: Proper state root handling
-	if header.Root == (common.Hash{}) {
-		if state != nil {
-			stateRoot, err := state.Commit(header.Number.Uint64(), true, false)
+	if s, ok := statedb.(*state.StateDB); ok {
+		if header.Root == (common.Hash{}) {
+			stateRoot, err := s.Commit(header.Number.Uint64(), true, false)
 			if err != nil {
-				return nil, fmt.Errorf("failed to commit state: %v", err)
+				log.Error("Failed to commit state in Finalize", "err", err, "number", header.Number)
+			} else {
+				header.Root = stateRoot
+				log.Debug("Committed state root in Finalize", "root", stateRoot.Hex(), "number", header.Number)
 			}
-			header.Root = stateRoot
-			log.Debug("Committed state root in FinalizeAndAssemble", "root", stateRoot.Hex(), "number", header.Number)
-		} else {
-			return nil, errors.New("state is nil and state root is zero")
 		}
-	}
-
-	// Calculate receipts root
-	if len(receipts) > 0 {
-		header.ReceiptHash = types.DeriveSha(types.Receipts(receipts), trie.NewStackTrie(nil))
 	} else {
-		header.ReceiptHash = types.EmptyReceiptsHash
+		log.Warn("State is not *state.StateDB, skipping commit")
 	}
 
-	// Calculate transaction root
-	if len(txs) > 0 {
-		header.TxHash = types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
-	} else {
-		header.TxHash = types.EmptyTxsHash
+	validator := header.Coinbase
+	e.updateValidatorState(validator)
+
+	if e.config.DecayEpochSize > 0 && e.blockNumber%e.config.DecayEpochSize == 0 {
+		e.decayAllReputation()
 	}
 
-	header.UncleHash = types.EmptyUncleHash
+	log.Debug("Finalized block", "number", header.Number, "validator", validator.Hex(), "txs", len(body.Transactions))
+}
 
-	log.Debug("Assembled block", "number", header.Number, "validator", validator.Hex(), "txs", len(txs), "state_root", header.Root.Hex())
-	
-body := &types.Body{
-    Transactions: txs,
-    Uncles:       uncles,
+
+func (e *PoIEngine) FinalizeAndAssemble(
+    chain consensus.ChainHeaderReader,
+    header *types.Header,
+    state *state.StateDB,
+    body *types.Body,
+    receipts []*types.Receipt,
+) (*types.Block, error) {
+    e.lock.Lock()
+    defer e.lock.Unlock()
+
+    // Cập nhật trạng thái validator
+    validator := header.Coinbase
+    e.updateValidatorState(validator)
+
+    if e.config.DecayEpochSize > 0 && e.blockNumber%e.config.DecayEpochSize == 0 {
+        e.decayAllReputation()
+    }
+
+    // Commit state root nếu chưa có
+    if header.Root == (common.Hash{}) {
+        if state != nil {
+            stateRoot, err := state.Commit(header.Number.Uint64(), true, false)
+            if err != nil {
+                return nil, fmt.Errorf("failed to commit state: %v", err)
+            }
+            header.Root = stateRoot
+            log.Debug("Committed state root", "root", stateRoot.Hex(), "number", header.Number)
+        } else {
+            return nil, errors.New("state is nil and root is empty")
+        }
+    }
+
+    // TxHash
+    if body != nil && len(body.Transactions) > 0 {
+        header.TxHash = types.DeriveSha(types.Transactions(body.Transactions), trie.NewStackTrie(nil))
+    } else {
+        header.TxHash = types.EmptyTxsHash
+    }
+
+    // UncleHash
+    if body != nil && len(body.Uncles) > 0 {
+        header.UncleHash = types.CalcUncleHash(body.Uncles)
+    } else {
+        header.UncleHash = types.EmptyUncleHash
+    }
+
+    // ReceiptHash
+    if len(receipts) > 0 {
+        header.ReceiptHash = types.DeriveSha(types.Receipts(receipts), trie.NewStackTrie(nil))
+    } else {
+        header.ReceiptHash = types.EmptyReceiptsHash
+    }
+
+    log.Debug("Assembled block", "number", header.Number, "validator", validator.Hex(), "txs", len(body.Transactions), "state_root", header.Root.Hex())
+
+    return types.NewBlock(header, body, receipts, nil), nil
 }
-hasher := types.NewHasher() // ✅ dùng hasher chính thức
-return types.NewBlock(header, body, receipts, hasher), nil
-}
+
 
 func (e *PoIEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	e.lock.RLock()
@@ -435,12 +451,7 @@ func (e *PoIEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block, 
 		}
 		e.taskMutex.Unlock()
 
-		// Create sealed block
-		body := &types.Body{
-    Transactions: block.Transactions(),
-    Uncles:       block.Uncles(),
-}
-		sealed := types.NewBlock(&signedHeader, body, nil, types.HomesteadTrieHasher{})
+		sealed := block.WithSeal(&signedHeader)
 		// Send result
 		select {
 		case results <- sealed:

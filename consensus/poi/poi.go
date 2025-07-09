@@ -12,6 +12,7 @@ import (
 	"hash"
 	"context"
 
+
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -212,11 +213,12 @@ func (e *PoIEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, heade
 	header.UncleHash = types.EmptyUncleHash
 
 	log.Debug("Assembled block", "number", header.Number, "validator", validator.Hex(), "txs", len(txs), "state_root", header.Root.Hex())
+	
 	body := &types.Body{
     Transactions: txs,
     Uncles:       uncles,
 }
-hasher := trie.NewStackTrieHasher(16)
+var hasher types.TrieHasher = &types.DefaultHasher{}
 return types.NewBlock(header, body, receipts, hasher), nil
 }
 

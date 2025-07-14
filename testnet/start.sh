@@ -1,0 +1,13 @@
+./../build/bin/geth \
+  --datadir ../testnet \
+  --networkid 6886 \
+  --unlock "0x48688a9fac710541f73f3003bd239ec9387a5185" \
+  --password ../password.txt \
+  --mine \
+  --miner.etherbase "0x48688a9fac710541f73f3003bd239ec9387a5185" \
+  --http --http.api personal,eth,net,web3,miner \
+  --allow-insecure-unlock \
+  --nodiscover \
+  --http.port 8510 --port 30310 \
+  --authrpc.addr 127.0.0.1 \
+  --authrpc.port 0
